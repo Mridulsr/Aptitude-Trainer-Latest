@@ -1,0 +1,71 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+.theme-immersive-ui {
+  color-scheme: dark;
+}
+
+.theme-space-slate {
+  color-scheme: dark;
+}
+
+.theme-cosmic-indigo {
+  color-scheme: dark;
+}
+
+.theme-cyberpunk-neon {
+  color-scheme: dark;
+}
+
+.theme-calming-forest {
+  color-scheme: light;
+}
+
+.theme-royal-crimson {
+  color-scheme: dark;
+}
+
+.theme-classic-amber {
+  color-scheme: dark;
+}
+
+.theme-warm-sepia {
+  color-scheme: light;
+}
+
+.theme-ocean-breeze {
+  color-scheme: dark;
+}
+
+.theme-minimal-charcoal {
+  color-scheme: dark;
+}
+
+.theme-solarized-gold {
+  color-scheme: light;
+}
+
+/* Custom visual fade-in animation classes */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

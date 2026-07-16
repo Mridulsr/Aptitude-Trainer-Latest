@@ -10,9 +10,12 @@ import { DSAChatbot } from './components/DSAChatbot';
 import { ProfileDashboard } from './components/ProfileDashboard';
 import { HelpGuide } from './components/HelpGuide';
 import { CompanyDirectory } from './components/CompanyDirectory';
-import { loadUserStats, saveUserStats, loadSpeedLogs } from './lib/firebase';
+import { loadUserStats, saveUserStats, loadSpeedLogs, getCurrentUser, logoutUser } from './lib/firebase';
+import { AuthPage } from './components/AuthPage';
+import { AppUser } from './types';
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(getCurrentUser());
   const [activeTab, setActiveTab] = useState<'practice-lab' | 'visualizer' | 'ai-chat' | 'dashboard' | 'help'>('practice-lab');
   const [aptitudeSubTab, setAptitudeSubTab] = useState<'practice' | 'directory'>('practice');
   const [activeVisualizer, setActiveVisualizer] = useState<'sorting' | 'bst' | 'linked-list'>('sorting');
@@ -87,8 +90,10 @@ export default function App() {
   };
 
   useEffect(() => {
-    syncStats();
-  }, []);
+    if (currentUser) {
+      syncStats();
+    }
+  }, [currentUser]);
 
   const handleThemeChange = (newTheme: Theme) => {
     setCurrentTheme(newTheme);
@@ -129,6 +134,10 @@ export default function App() {
         : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
     }`;
   };
+
+  if (!currentUser) {
+    return <AuthPage theme={currentTheme} onAuthSuccess={(user) => setCurrentUser(user)} />;
+  }
 
   return (
     <div className={`min-h-screen ${currentTheme.colors.bg} ${currentTheme.colors.text} transition-colors duration-500 pb-12`}>
@@ -219,6 +228,25 @@ export default function App() {
             <Flame className="w-4 h-4 animate-bounce" />
             <span className="text-xs font-extrabold font-mono">{userStats.streak} Days</span>
           </div>
+
+          {currentUser && (
+            <div className="flex items-center gap-2 border-l border-slate-800/80 pl-3">
+              <div className="hidden md:block text-right">
+                <span className="text-xs font-bold text-slate-200 block">{currentUser.name}</span>
+                <span className="text-[9px] text-slate-500 block font-semibold leading-none">{currentUser.targetCompany || 'All Companies'} Target</span>
+              </div>
+              <button
+                onClick={() => {
+                  logoutUser();
+                  setCurrentUser(null);
+                }}
+                className="px-2.5 py-1.5 bg-rose-950/20 hover:bg-rose-900/30 text-rose-400 hover:text-rose-300 rounded-xl text-[10px] font-bold border border-rose-900/30 transition-all cursor-pointer"
+                title="Log Out Account"
+              >
+                Log Out
+              </button>
+            </div>
+          )}
         </div>
       </header>
 

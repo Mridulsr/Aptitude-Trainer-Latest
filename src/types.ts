@@ -61,6 +61,18 @@ export interface UserStats {
   totalTimeSpent: number; // in seconds
 }
 
+export interface AppUser {
+  uid: string;
+  name: string;
+  email: string;
+  phone?: string;
+  authMethod?: 'email' | 'phone' | 'google';
+  password?: string;
+  targetCompany?: string;
+  levelPreference?: string;
+  createdAt: string;
+}
+
 export interface RoadmapModule {
   id: string;
   title: string;

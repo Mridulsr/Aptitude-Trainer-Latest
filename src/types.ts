@@ -80,3 +80,13 @@ export interface RoadmapModule {
   status: 'Completed' | 'In Progress' | 'Lock' | 'Coming Soon';
   difficulty: 'Easy' | 'Medium' | 'Hard';
 }
+
+export interface QuizProgress {
+  currentIdx: number;
+  questions: QuizQuestion[];
+  selectedLevel: string;
+  selectedTopic: string;
+  selectedCompany: string;
+  answers: { [questionId: number]: string }; // questionId -> selectedOption
+}
+

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, CheckCircle2, AlertTriangle, ChevronRight, HelpCircle, Flame, Send, Timer, Play, Pause, Upload, Link, FileText, Check, Plus } from 'lucide-react';
-import { QuizQuestion, Theme } from '../types';
+import { QuizQuestion, Theme, AppUser, SpeedLog } from '../types';
 import { DEFAULT_QUESTIONS, TOPICS } from '../data/dsaRoadmap';
-import { saveSpeedLog } from '../lib/firebase';
+import { saveSpeedLog, saveQuizProgress, loadQuizProgress } from '../lib/firebase';
 import { EASY_QUESTIONS_BOOST } from '../data/easy_questions_boost';
+import { ProgressReport } from './ProgressReport';
 
 interface AILabProps {
   theme: Theme;
@@ -12,11 +13,14 @@ interface AILabProps {
     score: number;
     solvedCount: number;
     streak: number;
+    totalTimeSpent: number;
   };
   quizTimerSeconds: number;
   setQuizTimerSeconds: React.Dispatch<React.SetStateAction<number>>;
   isQuizTimerRunning: boolean;
   setIsQuizTimerRunning: React.Dispatch<React.SetStateAction<boolean>>;
+  currentUser: AppUser | null;
+  speedLogs: SpeedLog[];
 }
 
 export const AILab: React.FC<AILabProps> = ({ 
@@ -26,7 +30,9 @@ export const AILab: React.FC<AILabProps> = ({
   quizTimerSeconds,
   setQuizTimerSeconds,
   isQuizTimerRunning,
-  setIsQuizTimerRunning
+  setIsQuizTimerRunning,
+  currentUser,
+  speedLogs
 }) => {
   const [selectedCompany, setSelectedCompany] = useState<string>('All');
   const [selectedTopic, setSelectedTopic] = useState<string>('All');
@@ -41,6 +47,11 @@ export const AILab: React.FC<AILabProps> = ({
   const [customPrompt, setCustomPrompt] = useState<string>('');
   const [aiError, setAiError] = useState<string>('');
 
+  // Save Progress states
+  const [answers, setAnswers] = useState<{ [questionId: number]: string }>({});
+  const [isGenerating50, setIsGenerating50] = useState<boolean>(false);
+  const [generationProgress, setGenerationProgress] = useState<number>(0);
+
   // Parser and uploader states
   const [isUploadOpen, setIsUploadOpen] = useState<boolean>(false);
   const [activeUploadTab, setActiveUploadTab] = useState<'text' | 'file' | 'link'>('text');
@@ -50,15 +61,47 @@ export const AILab: React.FC<AILabProps> = ({
   const [uploadSuccessMsg, setUploadSuccessMsg] = useState<string>('');
   const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
 
-  // Re-start timer whenever question changes
+
+  const [isLoaded, setIsLoaded] = useState<boolean>(false);
+
+  // Initialize progress from Firestore / LocalStorage on mount
   useEffect(() => {
-    setQuizTimerSeconds(0);
-    setIsQuizTimerRunning(true);
-    setSelectedOption('');
-    setIsSubmitted(false);
-    setAiExplanation('');
-    setAiError('');
-  }, [currentIdx, selectedTopic, selectedLevel, selectedCompany, setQuizTimerSeconds, setIsQuizTimerRunning]);
+    const initProgress = async () => {
+      try {
+        const saved = await loadQuizProgress();
+        if (saved) {
+          if (saved.questions && saved.questions.length > 0) {
+            setQuestions(saved.questions);
+          }
+          setSelectedLevel(saved.selectedLevel || 'Easy');
+          setSelectedTopic(saved.selectedTopic || 'All');
+          setSelectedCompany(saved.selectedCompany || 'All');
+          setCurrentIdx(saved.currentIdx || 0);
+          if (saved.answers) {
+            setAnswers(saved.answers);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load quiz progress:', err);
+      } finally {
+        setIsLoaded(true);
+      }
+    };
+    initProgress();
+  }, []);
+
+  // Save progress automatically when states change, with a loaded guard to prevent overwriting
+  useEffect(() => {
+    if (!isLoaded) return;
+    saveQuizProgress({
+      currentIdx,
+      questions,
+      selectedLevel,
+      selectedTopic,
+      selectedCompany,
+      answers,
+    });
+  }, [currentIdx, questions, selectedLevel, selectedTopic, selectedCompany, answers, isLoaded]);
 
   // Filter local questions
   const filteredQuestions = questions.filter((q) => {
@@ -69,6 +112,26 @@ export const AILab: React.FC<AILabProps> = ({
   });
 
   const activeQuestion = filteredQuestions[currentIdx] || null;
+
+  // Re-start timer whenever question changes
+  useEffect(() => {
+    setQuizTimerSeconds(0);
+    setIsQuizTimerRunning(true);
+
+    // Restore previously saved answer for this question if any
+    const savedAnswer = answers[activeQuestion?.id || 0];
+    if (savedAnswer) {
+      setSelectedOption(savedAnswer);
+      setIsSubmitted(true);
+      setIsQuizTimerRunning(false);
+      setAiExplanation(activeQuestion?.explanation || 'No explanation available.');
+    } else {
+      setSelectedOption('');
+      setIsSubmitted(false);
+      setAiExplanation('');
+    }
+    setAiError('');
+  }, [currentIdx, selectedTopic, selectedLevel, selectedCompany, activeQuestion, answers, setQuizTimerSeconds, setIsQuizTimerRunning]);
 
   // Shuffle array utility
   const shuffleArray = <T,>(array: T[]): T[] => {
@@ -100,6 +163,9 @@ export const AILab: React.FC<AILabProps> = ({
     
     // Show the predefined explanation immediately! Blazing fast!
     setAiExplanation(activeQuestion.explanation || 'No explanation available.');
+
+    // Save answer state locally and in firestore
+    setAnswers(prev => ({ ...prev, [activeQuestion.id]: selectedOption }));
 
     // Call callback to sync user profile score/count
     onSolveQuestion(timeSpentSeconds, isCorrect);
@@ -184,25 +250,86 @@ export const AILab: React.FC<AILabProps> = ({
     }
   };
 
-  // Ingest massive list of 100+ easy placement questions
-  const handleBoostEasyQuestions = () => {
-    const alreadyBoosted = questions.some(q => q.id >= 3001 && q.id <= 3050);
-    if (alreadyBoosted) {
-      setUploadSuccessMsg('🚀 Question bank already boosted with +50 Easy placement questions!');
+  // Dynamic 50-Question Generation Loop to securely build massive question sets!
+  const generate50Questions = async (level: 'Easy' | 'Medium' | 'Hard' | 'Advanced') => {
+    setIsGenerating50(true);
+    setGenerationProgress(0);
+    setAiError('');
+    setUploadSuccessMsg('');
+
+    if (level === 'Easy') {
+      const alreadyBoosted = questions.some(q => q.id >= 3001 && q.id <= 3050);
+      if (alreadyBoosted) {
+        setUploadSuccessMsg('🚀 Easy question bank already boosted with +50 Easy questions!');
+        setIsGenerating50(false);
+        return;
+      }
+      setQuestions(prev => [...EASY_QUESTIONS_BOOST, ...prev]);
+      setSelectedLevel('Easy');
+      setSelectedCompany('All');
+      setSelectedTopic('All');
+      setCurrentIdx(0);
+      setUploadSuccessMsg('🚀 Successfully boosted question bank with +50 High-Yield Easy placement questions! Try them out!');
+      setIsGenerating50(false);
       return;
     }
 
-    setQuestions(prev => [...EASY_QUESTIONS_BOOST, ...prev]);
-    setSelectedLevel('Easy');
-    setSelectedCompany('All');
-    setSelectedTopic('All');
-    setCurrentIdx(0);
-    setUploadSuccessMsg('🚀 Successfully boosted question bank with +50 High-Yield Easy placement questions! Try them out!');
-    
-    setTimeout(() => {
-      setUploadSuccessMsg('');
-    }, 5000);
+    let compiledQuestions: QuizQuestion[] = [];
+    const topicToGen = selectedTopic === 'All' ? 'Arithmetic' : selectedTopic;
+    const companyToGen = selectedCompany !== 'All' ? selectedCompany : 'All';
+
+    try {
+      // 5 batches of 10 questions each ensures robustness and zero timeouts
+      for (let batch = 1; batch <= 5; batch++) {
+        setGenerationProgress((batch - 1) * 10);
+        const response = await fetch('/api/generate-questions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            topic: topicToGen,
+            difficulty: level,
+            company: companyToGen !== 'All' ? companyToGen : undefined,
+            count: 10
+          }),
+        });
+
+        const data = await response.json();
+        if (data.questions && Array.isArray(data.questions) && data.questions.length > 0) {
+          const offset = Date.now() + Math.round(Math.random() * 100000);
+          const mapped = data.questions.map((q: QuizQuestion, index: number) => ({
+            ...q,
+            id: offset + index,
+            level: level
+          }));
+          compiledQuestions = [...compiledQuestions, ...mapped];
+          setQuestions(prev => [...mapped, ...prev]);
+        } else {
+          throw new Error('AI failed to produce structured questions in this batch.');
+        }
+        setGenerationProgress(batch * 10);
+      }
+
+      setSelectedLevel(level);
+      setCurrentIdx(0);
+      setUploadSuccessMsg(`🎉 Successfully generated and appended 50 premium AI-crafted ${level} MCQs targeting ${topicToGen}!`);
+    } catch (err: any) {
+      console.error(err);
+      setAiError(`Batch generation paused. Generated ${compiledQuestions.length} questions successfully before hitting AI transient limits.`);
+      if (compiledQuestions.length > 0) {
+        setSelectedLevel(level);
+        setCurrentIdx(0);
+      }
+    } finally {
+      setIsGenerating50(false);
+      setGenerationProgress(0);
+    }
   };
+
+  // Ingest massive list of 100+ easy placement questions
+  const handleBoostEasyQuestions = () => {
+    generate50Questions('Easy');
+  };
+
 
   // Parse questions from document file, text, or link
   const handleUploadAndParse = async (e?: React.FormEvent) => {
@@ -448,15 +575,38 @@ export const AILab: React.FC<AILabProps> = ({
         </button>
 
         <div className="border-t border-slate-800/80 pt-5 space-y-4">
-          <div className="flex flex-col gap-2">
-            <button
-              id="btn-boost-easy"
-              onClick={handleBoostEasyQuestions}
-              className="w-full py-2.5 rounded-xl text-xs font-bold text-emerald-400 bg-emerald-950/20 hover:bg-emerald-950/40 border border-emerald-900/60 shadow-md flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              🚀 Boost Question Bank (+50 Easy MCQs)
-            </button>
+          <div className="space-y-2">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-400 block">⚡ Question Booster Center (+50 MCQs)</span>
+            <div className="grid grid-cols-2 gap-1.5">
+              {(['Easy', 'Medium', 'Hard', 'Advanced'] as const).map((lvl) => (
+                <button
+                  id={`btn-boost-${lvl}`}
+                  key={lvl}
+                  onClick={() => generate50Questions(lvl)}
+                  disabled={isGenerating50}
+                  className="py-2 px-2.5 rounded-xl text-[10px] font-bold text-emerald-300 bg-emerald-950/10 hover:bg-emerald-950/30 border border-emerald-900/30 shadow-sm flex items-center justify-center gap-1 transition-all cursor-pointer disabled:opacity-40"
+                >
+                  <Plus className="w-3 h-3 text-emerald-400" />
+                  <span>Boost {lvl}</span>
+                </button>
+              ))}
+            </div>
+
+            {isGenerating50 && (
+              <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-900 text-xs space-y-2 animate-fade-in">
+                <div className="flex justify-between items-center text-[10px] font-extrabold text-indigo-400 uppercase tracking-widest font-mono">
+                  <span>Generating Batch...</span>
+                  <span>{generationProgress}/50</span>
+                </div>
+                <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-300"
+                    style={{ width: `${(generationProgress / 50) * 100}%` }}
+                  />
+                </div>
+                <span className="text-[9px] text-slate-500 block text-right">Drafting high-yield placement problems...</span>
+              </div>
+            )}
 
             <button
               id="btn-toggle-upload"
@@ -697,8 +847,31 @@ export const AILab: React.FC<AILabProps> = ({
               })}
             </div>
 
+            {/* If on the last question of the set, guide the user to boost! */}
+            {currentIdx === filteredQuestions.length - 1 && (
+              <div className="p-4 rounded-2xl bg-indigo-950/20 border border-indigo-900/40 text-xs text-indigo-300 leading-relaxed flex items-center gap-3 animate-fade-in">
+                <Sparkles className="w-5 h-5 text-amber-400 flex-shrink-0 animate-bounce" />
+                <div>
+                  <span className="font-extrabold block text-white text-xs uppercase tracking-wide">🏆 You reached the final question!</span>
+                  <span>Practice makes perfect. Click the <strong>Boost +50 More {selectedLevel} Qs</strong> button to dynamically expand this section with high-yield placement MCQs generated live by Gemini.</span>
+                </div>
+              </div>
+            )}
+
             {/* Actions: Submit & Next */}
-            <div className="flex gap-3 justify-end pt-4">
+            <div className="flex flex-wrap gap-3 justify-end items-center pt-4">
+              {isSubmitted && currentIdx === filteredQuestions.length - 1 && (
+                <button
+                  id="btn-trigger-boost-50-last"
+                  onClick={() => generate50Questions(selectedLevel as any)}
+                  disabled={isGenerating50}
+                  className="px-5 py-3 rounded-xl text-xs md:text-sm font-extrabold text-white bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 hover:scale-[1.02] shadow-lg shadow-emerald-500/20 transition-all duration-200 cursor-pointer flex items-center gap-1.5 animate-pulse"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  <span>{isGenerating50 ? 'Generating 50 Qs...' : `Boost +50 More ${selectedLevel} Qs`}</span>
+                </button>
+              )}
+
               {!isSubmitted ? (
                 <button
                   id="btn-quiz-submit"
@@ -714,7 +887,7 @@ export const AILab: React.FC<AILabProps> = ({
                   onClick={handleNext}
                   className="px-6 py-3 rounded-xl text-xs md:text-sm font-extrabold text-white bg-slate-800 hover:bg-slate-700 hover:scale-[1.02] transition-all duration-200 cursor-pointer flex items-center gap-1.5"
                 >
-                  Next Question <ChevronRight className="w-4 h-4" />
+                  {currentIdx === filteredQuestions.length - 1 ? 'Restart Set' : 'Next Question'} <ChevronRight className="w-4 h-4" />
                 </button>
               )}
             </div>
@@ -806,6 +979,23 @@ export const AILab: React.FC<AILabProps> = ({
           </div>
         )}
       </div>
+
+      {/* Progress Report & suggestion graphs at the very bottom */}
+      <div className="lg:col-span-12">
+        <ProgressReport 
+          theme={theme}
+          userStats={{
+            score: userStats.score,
+            solvedCount: userStats.solvedCount,
+            streak: userStats.streak,
+            totalTimeSpent: userStats.totalTimeSpent || 0
+          }}
+          speedLogs={speedLogs}
+          currentUser={currentUser}
+          questions={questions}
+        />
+      </div>
     </div>
   );
 };
+

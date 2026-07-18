@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, where, getDocFromServer } from 'firebase/firestore';
-import { ChatMessage, SpeedLog, UserStats, AppUser } from '../types';
+import { ChatMessage, SpeedLog, UserStats, AppUser, QuizQuestion } from '../types';
 
 // Web Firebase Configuration
 const firebaseConfig = {
@@ -559,3 +559,50 @@ export async function clearChatHistory(): Promise<void> {
   localStorage.removeItem(STORAGE_CHAT_KEY);
   // Optional: could delete from firestore, but simple local reset is enough for clear chat workflow
 }
+
+// --- QUIZ PROGRESS / SAVE PROGRESS WORKFLOW ---
+export interface QuizProgress {
+  currentIdx: number;
+  questions: QuizQuestion[];
+  selectedLevel: string;
+  selectedTopic: string;
+  selectedCompany: string;
+  answers: { [questionId: number]: string };
+}
+
+export async function saveQuizProgress(progress: QuizProgress): Promise<void> {
+  const userId = getCurrentUserId();
+  localStorage.setItem(`quiz_progress_${userId}`, JSON.stringify(progress));
+  try {
+    const docRef = doc(db, 'users', userId, 'progress', 'quizProgress');
+    await setDoc(docRef, progress);
+  } catch (error) {
+    console.error('Failed to save quiz progress to cloud:', error);
+  }
+}
+
+export async function loadQuizProgress(): Promise<QuizProgress | null> {
+  const userId = getCurrentUserId();
+  try {
+    const docRef = doc(db, 'users', userId, 'progress', 'quizProgress');
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const progress = docSnap.data() as QuizProgress;
+      localStorage.setItem(`quiz_progress_${userId}`, JSON.stringify(progress));
+      return progress;
+    }
+  } catch (error) {
+    console.warn('Firestore failed to load quiz progress, falling back to localStorage:', error);
+  }
+
+  const cached = localStorage.getItem(`quiz_progress_${userId}`);
+  if (cached) {
+    try {
+      return JSON.parse(cached) as QuizProgress;
+    } catch (e) {
+      return null;
+    }
+  }
+  return null;
+}
+

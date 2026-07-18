@@ -354,6 +354,8 @@ export default function App() {
                         setQuizTimerSeconds={setQuizTimerSeconds}
                         isQuizTimerRunning={isQuizTimerRunning}
                         setIsQuizTimerRunning={setIsQuizTimerRunning}
+                        currentUser={currentUser}
+                        speedLogs={speedLogs}
                       />
                       <div className="grid grid-cols-1 gap-10">
                         <div className={`p-8 rounded-2xl border ${currentTheme.colors.card} transition-all flex flex-col justify-between space-y-6`}>

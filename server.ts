@@ -268,6 +268,117 @@ async function callGeminiWithRetry(params: any, retries = 3, delay = 1000): Prom
   }
 }
 
+// --- ROBUST JSON PARSER FOR RELIABLE QUESTION GENERATION ---
+function parseRobustJsonArray(rawText: string): any[] {
+  let cleaned = (rawText || '').trim();
+  if (!cleaned) {
+    return [];
+  }
+
+  // Strip markdown code fences if present
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  }
+
+  // Try parsing directly first
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    console.warn('Initial JSON parse failed, attempting regex/trailing-comma cleaning...', e);
+  }
+
+  // Clean trailing commas in arrays and objects
+  cleaned = cleaned.replace(/,\s*\]/g, ']');
+  cleaned = cleaned.replace(/,\s*\}/g, '}');
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (err: any) {
+    console.warn('Post-regex JSON parse failed, trying partial recovery...', err);
+    try {
+      return parseTruncatedJsonArray(cleaned);
+    } catch (finalErr) {
+      throw err; // throw original parse error if recovery also fails
+    }
+  }
+}
+
+function parseTruncatedJsonArray(jsonStr: string): any[] {
+  let text = jsonStr.trim();
+  if (!text.startsWith('[')) {
+    if (text.startsWith('{')) {
+      text = '[' + text;
+    } else {
+      throw new Error('Not a valid JSON array or object structure');
+    }
+  }
+
+  // Find the last index of '}'
+  const lastCurly = text.lastIndexOf('}');
+  if (lastCurly !== -1) {
+    const candidate = text.substring(0, lastCurly + 1) + ']';
+    try {
+      return JSON.parse(candidate);
+    } catch (e) {
+      return extractValidObjectsFromArray(text);
+    }
+  }
+  throw new Error('No valid objects found');
+}
+
+function extractValidObjectsFromArray(text: string): any[] {
+  const result: any[] = [];
+  let braceCount = 0;
+  let inString = false;
+  let escape = false;
+  let startIdx = -1;
+
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (escape) {
+      escape = false;
+      continue;
+    }
+    if (char === '\\') {
+      escape = true;
+      continue;
+    }
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+    if (!inString) {
+      if (char === '{') {
+        if (braceCount === 0) {
+          startIdx = i;
+        }
+        braceCount++;
+      } else if (char === '}') {
+        braceCount--;
+        if (braceCount === 0 && startIdx !== -1) {
+          const objStr = text.substring(startIdx, i + 1);
+          try {
+            const parsed = JSON.parse(objStr);
+            result.push(parsed);
+          } catch (e) {
+            try {
+              let cleanedObj = objStr.replace(/,\s*\}/g, '}');
+              result.push(JSON.parse(cleanedObj));
+            } catch (innerErr) {
+              // Ignore invalid single object
+            }
+          }
+          startIdx = -1;
+        }
+      }
+    }
+  }
+  if (result.length > 0) {
+    return result;
+  }
+  throw new Error('Could not parse any objects');
+}
+
 // --- API ENDPOINTS ---
 
 // Secure Server-side API endpoint for Chatbot conversation
@@ -455,7 +566,7 @@ app.post('/api/generate-questions', async (req, res) => {
       }
     });
 
-    const questionsJson = JSON.parse(response.text || '[]');
+    const questionsJson = parseRobustJsonArray(response.text || '[]');
     res.json({ questions: questionsJson });
   } catch (error: any) {
     console.log('Gemini question generation failed (Offline Mode active):', error?.message || error);
@@ -540,7 +651,7 @@ interface QuizQuestion {
       }
     });
 
-    const parsedQuestions = JSON.parse(response.text || '[]');
+    const parsedQuestions = parseRobustJsonArray(response.text || '[]');
     res.json({ questions: parsedQuestions });
   } catch (error: any) {
     console.log('Gemini question parser failed (Offline Mode active):', error?.message || error);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, CheckCircle2, AlertTriangle, ChevronRight, HelpCircle, Flame, Send, Timer, Play, Pause, Upload, Link, FileText, Check, Plus } from 'lucide-react';
+import { Sparkles, CheckCircle2, AlertTriangle, ChevronRight, HelpCircle, Flame, Send, Timer, Play, Pause, Upload, Link, FileText, Check, Plus, Flag } from 'lucide-react';
 import { QuizQuestion, Theme, AppUser, SpeedLog } from '../types';
 import { DEFAULT_QUESTIONS, TOPICS } from '../data/dsaRoadmap';
 import { saveSpeedLog, saveQuizProgress, loadQuizProgress } from '../lib/firebase';
@@ -49,6 +49,8 @@ export const AILab: React.FC<AILabProps> = ({
 
   // Save Progress states
   const [answers, setAnswers] = useState<{ [questionId: number]: string }>({});
+  const [flaggedQuestions, setFlaggedQuestions] = useState<{ [questionId: number]: boolean }>({});
+  const [navigationWarning, setNavigationWarning] = useState<string>('');
   const [isGenerating50, setIsGenerating50] = useState<boolean>(false);
   const [generationProgress, setGenerationProgress] = useState<number>(0);
 
@@ -80,6 +82,9 @@ export const AILab: React.FC<AILabProps> = ({
           if (saved.answers) {
             setAnswers(saved.answers);
           }
+          if (saved.flaggedQuestions) {
+            setFlaggedQuestions(saved.flaggedQuestions);
+          }
         }
       } catch (err) {
         console.warn('Failed to load quiz progress:', err);
@@ -100,8 +105,9 @@ export const AILab: React.FC<AILabProps> = ({
       selectedTopic,
       selectedCompany,
       answers,
+      flaggedQuestions,
     });
-  }, [currentIdx, questions, selectedLevel, selectedTopic, selectedCompany, answers, isLoaded]);
+  }, [currentIdx, questions, selectedLevel, selectedTopic, selectedCompany, answers, flaggedQuestions, isLoaded]);
 
   // Filter local questions
   const filteredQuestions = questions.filter((q) => {
@@ -155,6 +161,7 @@ export const AILab: React.FC<AILabProps> = ({
   const handleSubmit = async () => {
     if (!activeQuestion || !selectedOption || isSubmitted) return;
 
+    setNavigationWarning('');
     const timeSpentSeconds = quizTimerSeconds;
     const isCorrect = selectedOption === activeQuestion.answer;
 
@@ -210,11 +217,30 @@ export const AILab: React.FC<AILabProps> = ({
     }
   };
 
+  const safeNavigateToIdx = (targetIdx: number) => {
+    if (selectedOption !== '' && !isSubmitted) {
+      setNavigationWarning('⚠️ You have selected an answer! You must click "Submit Answer" first, or clear/deselect your choice by clicking it again if you want to leave this question unattempted.');
+      return;
+    }
+    setNavigationWarning('');
+    if (targetIdx >= 0 && targetIdx < filteredQuestions.length) {
+      setCurrentIdx(targetIdx);
+    }
+  };
+
   const handleNext = () => {
     if (currentIdx < filteredQuestions.length - 1) {
-      setCurrentIdx(currentIdx + 1);
+      safeNavigateToIdx(currentIdx + 1);
     } else {
-      setCurrentIdx(0); // wrap around
+      safeNavigateToIdx(0); // wrap around
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentIdx > 0) {
+      safeNavigateToIdx(currentIdx - 1);
+    } else {
+      safeNavigateToIdx(filteredQuestions.length - 1); // wrap around
     }
   };
 
@@ -258,17 +284,30 @@ export const AILab: React.FC<AILabProps> = ({
     setUploadSuccessMsg('');
 
     if (level === 'Easy') {
-      const alreadyBoosted = questions.some(q => q.id >= 3001 && q.id <= 3050);
+      const alreadyBoosted = questions.some(q => q.id >= 9001 && q.id <= 9060);
       if (alreadyBoosted) {
         setUploadSuccessMsg('🚀 Easy question bank already boosted with +50 Easy questions!');
         setIsGenerating50(false);
         return;
       }
-      setQuestions(prev => [...EASY_QUESTIONS_BOOST, ...prev]);
+
+      // Simulate a realistic uploading/progress delay for the user to see the dialog box & progress sequence
+      for (let p = 0; p <= 50; p += 10) {
+        setGenerationProgress(p);
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+
+      const mappedBoost = EASY_QUESTIONS_BOOST.map((q, idx) => ({
+        ...q,
+        id: 9001 + idx,
+        level: 'Easy' as const
+      }));
+
+      setQuestions(prev => [...prev, ...mappedBoost]);
       setSelectedLevel('Easy');
       setSelectedCompany('All');
       setSelectedTopic('All');
-      setCurrentIdx(0);
+      // Keep currentIdx unchanged to allow seamless progression to newly added questions
       setUploadSuccessMsg('🚀 Successfully boosted question bank with +50 High-Yield Easy placement questions! Try them out!');
       setIsGenerating50(false);
       return;
@@ -302,7 +341,7 @@ export const AILab: React.FC<AILabProps> = ({
             level: level
           }));
           compiledQuestions = [...compiledQuestions, ...mapped];
-          setQuestions(prev => [...mapped, ...prev]);
+          setQuestions(prev => [...prev, ...mapped]);
         } else {
           throw new Error('AI failed to produce structured questions in this batch.');
         }
@@ -310,14 +349,13 @@ export const AILab: React.FC<AILabProps> = ({
       }
 
       setSelectedLevel(level);
-      setCurrentIdx(0);
+      // Keep currentIdx unchanged to allow seamless progression to newly added questions
       setUploadSuccessMsg(`🎉 Successfully generated and appended 50 premium AI-crafted ${level} MCQs targeting ${topicToGen}!`);
     } catch (err: any) {
       console.error(err);
       setAiError(`Batch generation paused. Generated ${compiledQuestions.length} questions successfully before hitting AI transient limits.`);
       if (compiledQuestions.length > 0) {
         setSelectedLevel(level);
-        setCurrentIdx(0);
       }
     } finally {
       setIsGenerating50(false);
@@ -488,6 +526,46 @@ export const AILab: React.FC<AILabProps> = ({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 md:gap-10">
+      {/* Blocking overlay dialog when uploading/generating questions */}
+      {isGenerating50 && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-[9999] flex items-center justify-center p-4">
+          <div className="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-5 animate-scale-up text-center">
+            <div className="w-16 h-16 bg-indigo-500/10 text-indigo-400 rounded-full flex items-center justify-center mx-auto animate-pulse">
+              <Sparkles className="w-8 h-8 text-amber-300 animate-spin" style={{ animationDuration: '3s' }} />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-base font-extrabold text-white">Please wait till the new questions are being uploaded</h3>
+              <p className="text-xs text-slate-400 leading-relaxed">
+                Gemini is generating and verifying professional placement questions. Practice section controls and navigation are currently paused.
+              </p>
+            </div>
+            
+            {/* Progress Section */}
+            <div className="bg-slate-950 p-4 rounded-2xl border border-slate-850 space-y-2.5 text-left">
+              <div className="flex justify-between items-center text-[10px] font-extrabold text-indigo-400 uppercase tracking-widest font-mono">
+                <span>Generating Batch...</span>
+                <span>{generationProgress}/50 Completed</span>
+              </div>
+              <div className="w-full h-1.5 bg-slate-900 rounded-full overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-300"
+                  style={{ width: `${(generationProgress / 50) * 100}%` }}
+                />
+              </div>
+              <div className="flex justify-between text-[9px] text-slate-500 font-medium">
+                <span>Active set: {questions.length} Qs</span>
+                <span>Adding: 50 Questions</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 justify-center text-[10px] text-indigo-400 font-extrabold animate-pulse uppercase tracking-wider">
+              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 block animate-ping"></span>
+              <span>Compiling live MCQs from Gemini...</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Filters & Configuration */}
       <div className={`lg:col-span-4 p-8 rounded-2xl border ${theme.colors.card} shadow-xl shadow-black/20 transition-all h-fit space-y-6`}>
         <div>
@@ -747,6 +825,117 @@ export const AILab: React.FC<AILabProps> = ({
 
       {/* Main Practice Quiz Area */}
       <div className="lg:col-span-8 space-y-8">
+        {/* TCS Exam Style Dashboard Card */}
+        <div className={`p-6 rounded-3xl border ${theme.colors.card} shadow-xl shadow-black/20 space-y-5 transition-all`}>
+          {/* Title & Instructions */}
+          <div className="border-b border-slate-800/60 pb-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
+            <div>
+              <h4 className="text-sm font-extrabold text-indigo-400 uppercase tracking-widest flex items-center gap-1.5">
+                📝 TCS MCQ Exam Simulator
+              </h4>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Active status dashboard and instructions panel.
+              </p>
+            </div>
+            {/* Status Indicators Legend */}
+            <div className="flex flex-wrap gap-3 text-[10px] font-extrabold">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-slate-900 border border-slate-800 block"></span>
+                <span className="text-slate-400">Unattempted</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 block"></span>
+                <span className="text-emerald-400 font-sans">Attempted</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 block"></span>
+                <span className="text-amber-400">Marked for Review</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded ring-2 ring-indigo-500 bg-indigo-950 block"></span>
+                <span className="text-indigo-400">Current</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Instructions Collapse or list */}
+          <div className="bg-slate-950/60 border border-slate-900 rounded-2xl p-4.5 space-y-2">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 block">📢 Exam Instructions & Rules:</span>
+            <ul className="text-[11px] text-slate-300 space-y-1.5 list-disc list-inside leading-relaxed">
+              <li>Select any box from the <strong>Question Palette</strong> to navigate directly.</li>
+              <li>Click on choices to select an answer. Click again to <strong>deselect / clear selection</strong>.</li>
+              <li><span className="text-rose-400 font-extrabold">Attempt Constraint:</span> If an option is selected, you <strong>cannot leave the question</strong> without clicking <strong>"Submit Answer"</strong>.</li>
+              <li>Use the <strong>"Mark for Review"</strong> flag button to highlight questions you want to double-check.</li>
+            </ul>
+          </div>
+
+          {/* Question Palette Grid */}
+          <div className="space-y-2.5">
+            <span className="text-[10px] font-extrabold uppercase tracking-widest text-slate-500 block">🔢 Compact Question Palette ({filteredQuestions.length} Questions)</span>
+            {filteredQuestions.length === 0 ? (
+              <p className="text-xs text-slate-500">No questions found matching your filter options. Try changing filters or boosting!</p>
+            ) : (
+              <div className="flex flex-wrap gap-1.5 max-h-[110px] overflow-y-auto p-1 scrollbar-thin">
+                {filteredQuestions.map((q, idx) => {
+                  const isCurrent = idx === currentIdx;
+                  const isAnswered = answers[q.id] !== undefined;
+                  const isFlagged = flaggedQuestions[q.id] === true;
+
+                  let bgClass = 'bg-slate-950 border border-slate-900 text-slate-500 hover:border-slate-750';
+                  if (isAnswered) {
+                    bgClass = 'bg-emerald-950/40 border-emerald-500/60 text-emerald-300 font-bold hover:bg-emerald-950/60';
+                  } else if (isFlagged) {
+                    bgClass = 'bg-amber-950/40 border-amber-500/60 text-amber-300 font-bold hover:bg-amber-950/60';
+                  }
+
+                  return (
+                    <button
+                      key={q.id}
+                      id={`palette-box-${idx}`}
+                      onClick={() => !isGenerating50 && safeNavigateToIdx(idx)}
+                      disabled={isGenerating50}
+                      className={`w-7 h-7 rounded-lg font-mono text-[10px] font-bold transition-all duration-150 flex items-center justify-center relative cursor-pointer ${bgClass} ${
+                        isCurrent ? 'ring-2 ring-indigo-500 ring-offset-1 ring-offset-slate-950 scale-105 text-indigo-300 border-indigo-500' : ''
+                      }`}
+                    >
+                      <span>{idx + 1}</span>
+                      {isFlagged && (
+                        <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-amber-400 rounded-full"></span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Number-Wise Continuous Question Track Segment */}
+          <div className="bg-slate-950 border border-slate-900 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <span className="text-[10px] font-extrabold uppercase tracking-widest text-emerald-400 block">📊 Number-Wise Extension Track</span>
+              <p className="text-[11px] text-slate-400 leading-normal">
+                Continuous sequential count: questions <strong className="text-white">1 to {filteredQuestions.length}</strong>.
+                {filteredQuestions.length > 49 && (
+                  <span className="text-indigo-400 ml-1 font-semibold">
+                    (Successfully expanded from 49 to {filteredQuestions.length}!)
+                  </span>
+                )}
+              </p>
+            </div>
+            <div className="flex items-center gap-2 font-mono text-[10px] font-bold">
+              <span className="px-2 py-1 rounded bg-slate-900 border border-slate-800 text-slate-400">Total: <strong className="text-white">{filteredQuestions.length}</strong></span>
+              <span className="px-2 py-1 rounded bg-emerald-950/40 border border-emerald-900/40 text-emerald-400">Solved: <strong className="text-emerald-300">{Object.keys(answers).length}</strong></span>
+            </div>
+          </div>
+        </div>
+
+        {navigationWarning && (
+          <div className="p-4.5 bg-rose-500/10 border border-rose-500/20 text-rose-300 rounded-2xl text-xs flex items-center gap-2.5 animate-pulse">
+            <AlertTriangle className="w-5 h-5 flex-shrink-0 text-rose-400 animate-bounce" />
+            <span className="font-extrabold leading-relaxed">{navigationWarning}</span>
+          </div>
+        )}
+
         {activeQuestion ? (
           <div className={`p-8 rounded-3xl border ${theme.colors.card} shadow-xl shadow-black/20 transition-all space-y-6`}>
             {/* Topic Header & Company tag */}
@@ -837,7 +1026,12 @@ export const AILab: React.FC<AILabProps> = ({
                   <button
                     id={`opt-btn-${opt}`}
                     key={opt}
-                    onClick={() => !isSubmitted && setSelectedOption(opt)}
+                    onClick={() => {
+                      if (!isSubmitted) {
+                        setSelectedOption(selectedOption === opt ? '' : opt);
+                        setNavigationWarning('');
+                      }
+                    }}
                     disabled={isSubmitted}
                     className={`w-full text-left p-4.5 rounded-2xl border text-xs md:text-sm font-semibold transition-all duration-200 cursor-pointer shadow-sm hover:scale-[1.01] ${optBorder}`}
                   >
@@ -858,38 +1052,69 @@ export const AILab: React.FC<AILabProps> = ({
               </div>
             )}
 
-            {/* Actions: Submit & Next */}
-            <div className="flex flex-wrap gap-3 justify-end items-center pt-4">
-              {isSubmitted && currentIdx === filteredQuestions.length - 1 && (
+            {/* Actions: Previous, Flag, Submit & Next */}
+            <div className="flex flex-wrap gap-3 justify-between items-center pt-4 border-t border-slate-800/40">
+              <div className="flex flex-wrap gap-2">
+                {/* Previous Button */}
                 <button
-                  id="btn-trigger-boost-50-last"
-                  onClick={() => generate50Questions(selectedLevel as any)}
-                  disabled={isGenerating50}
-                  className="px-5 py-3 rounded-xl text-xs md:text-sm font-extrabold text-white bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 hover:scale-[1.02] shadow-lg shadow-emerald-500/20 transition-all duration-200 cursor-pointer flex items-center gap-1.5 animate-pulse"
+                  id="btn-quiz-prev"
+                  onClick={handlePrevious}
+                  className="px-4 py-2.5 rounded-xl text-xs font-extrabold text-slate-300 bg-slate-900 border border-slate-800 hover:bg-slate-850 transition-all duration-200 cursor-pointer flex items-center gap-1.5"
                 >
-                  <Sparkles className="w-4 h-4 text-amber-300" />
-                  <span>{isGenerating50 ? 'Generating 50 Qs...' : `Boost +50 More ${selectedLevel} Qs`}</span>
+                  Previous
                 </button>
-              )}
 
-              {!isSubmitted ? (
+                {/* Flag Button */}
                 <button
-                  id="btn-quiz-submit"
-                  onClick={handleSubmit}
-                  disabled={!selectedOption}
-                  className="px-6 py-3 rounded-xl text-xs md:text-sm font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 hover:scale-[1.02] shadow-lg shadow-indigo-500/20 transition-all duration-200 cursor-pointer disabled:opacity-40"
+                  id="btn-quiz-flag"
+                  onClick={() => {
+                    const qId = activeQuestion.id;
+                    setFlaggedQuestions(prev => ({ ...prev, [qId]: !prev[qId] }));
+                  }}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all duration-200 cursor-pointer flex items-center gap-1.5 ${
+                    flaggedQuestions[activeQuestion.id]
+                      ? 'bg-amber-500/20 border border-amber-500/50 text-amber-300 animate-pulse'
+                      : 'bg-slate-900 border border-slate-800 text-slate-400 hover:text-slate-350'
+                  }`}
+                  title="Mark this question for review"
                 >
-                  Submit Answer
+                  <Flag className={`w-3.5 h-3.5 ${flaggedQuestions[activeQuestion.id] ? 'fill-amber-400 text-amber-400' : 'text-slate-400'}`} />
+                  <span>{flaggedQuestions[activeQuestion.id] ? 'Flagged for Review' : 'Mark for Review'}</span>
                 </button>
-              ) : (
-                <button
-                  id="btn-quiz-next"
-                  onClick={handleNext}
-                  className="px-6 py-3 rounded-xl text-xs md:text-sm font-extrabold text-white bg-slate-800 hover:bg-slate-700 hover:scale-[1.02] transition-all duration-200 cursor-pointer flex items-center gap-1.5"
-                >
-                  {currentIdx === filteredQuestions.length - 1 ? 'Restart Set' : 'Next Question'} <ChevronRight className="w-4 h-4" />
-                </button>
-              )}
+              </div>
+
+              <div className="flex gap-2">
+                {isSubmitted && currentIdx === filteredQuestions.length - 1 && (
+                  <button
+                    id="btn-trigger-boost-50-last"
+                    onClick={() => generate50Questions(selectedLevel as any)}
+                    disabled={isGenerating50}
+                    className="px-5 py-2.5 rounded-xl text-xs font-extrabold text-white bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-700 hover:to-teal-600 shadow-lg shadow-emerald-500/20 transition-all duration-200 cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Sparkles className="w-4 h-4 text-amber-300 animate-spin" style={{ animationDuration: '3s' }} />
+                    <span>{isGenerating50 ? 'Generating...' : `Boost +50 Qs`}</span>
+                  </button>
+                )}
+
+                {!isSubmitted ? (
+                  <button
+                    id="btn-quiz-submit"
+                    onClick={handleSubmit}
+                    disabled={!selectedOption}
+                    className="px-6 py-2.5 rounded-xl text-xs font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 hover:scale-[1.02] shadow-lg shadow-indigo-500/20 transition-all duration-200 cursor-pointer disabled:opacity-40"
+                  >
+                    Submit Answer
+                  </button>
+                ) : (
+                  <button
+                    id="btn-quiz-next"
+                    onClick={handleNext}
+                    className="px-6 py-2.5 rounded-xl text-xs font-extrabold text-white bg-slate-800 hover:bg-slate-700 hover:scale-[1.02] transition-all duration-200 cursor-pointer flex items-center gap-1.5"
+                  >
+                    {currentIdx === filteredQuestions.length - 1 ? 'Restart Set' : 'Next Question'} <ChevronRight className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Live Score & Correct Answer feedback banner */}

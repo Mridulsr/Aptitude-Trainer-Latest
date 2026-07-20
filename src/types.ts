@@ -88,5 +88,6 @@ export interface QuizProgress {
   selectedTopic: string;
   selectedCompany: string;
   answers: { [questionId: number]: string }; // questionId -> selectedOption
+  flaggedQuestions?: { [questionId: number]: boolean }; // questionId -> isFlagged
 }
 

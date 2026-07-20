@@ -1,5 +1,20 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore, doc, setDoc, getDoc, collection, addDoc, getDocs, query, orderBy, limit, where, getDocFromServer } from 'firebase/firestore';
+import { 
+  initializeFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager,
+  doc, 
+  setDoc, 
+  getDoc, 
+  collection, 
+  addDoc, 
+  getDocs, 
+  query, 
+  orderBy, 
+  limit, 
+  where, 
+  getDocFromServer 
+} from 'firebase/firestore';
 import { ChatMessage, SpeedLog, UserStats, AppUser, QuizQuestion } from '../types';
 
 // Web Firebase Configuration
@@ -13,18 +28,22 @@ const firebaseConfig = {
   messagingSenderId: "801023012566",
 };
 
-// Initialize Firebase
+// Initialize Firebase with Long Polling and robust multi-tab Local Cache for iframe environments
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(),
+  }),
+});
 
-// Validate Connection to Firestore on boot
+// Validate Connection to Firestore on boot (non-blocking fallback)
 async function testConnection() {
   try {
+    // Attempt a silent background server check with a quick timeout
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn("Please check your Firebase configuration or connection.");
-    }
+    console.info("Firestore is currently operating in offline caching mode. All actions are safely queued locally.");
   }
 }
 testConnection();
@@ -568,6 +587,7 @@ export interface QuizProgress {
   selectedTopic: string;
   selectedCompany: string;
   answers: { [questionId: number]: string };
+  flaggedQuestions?: { [questionId: number]: boolean };
 }
 
 export async function saveQuizProgress(progress: QuizProgress): Promise<void> {

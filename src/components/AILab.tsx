@@ -825,13 +825,13 @@ export const AILab: React.FC<AILabProps> = ({
 
       {/* Main Practice Quiz Area */}
       <div className="lg:col-span-8 space-y-8">
-        {/* TCS Exam Style Dashboard Card */}
+        {/* Exam Style Dashboard Card */}
         <div className={`p-6 rounded-3xl border ${theme.colors.card} shadow-xl shadow-black/20 space-y-5 transition-all`}>
           {/* Title & Instructions */}
           <div className="border-b border-slate-800/60 pb-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
             <div>
               <h4 className="text-sm font-extrabold text-indigo-400 uppercase tracking-widest flex items-center gap-1.5">
-                📝 TCS MCQ Exam Simulator
+                📝 MCQ Exam Simulator
               </h4>
               <p className="text-[11px] text-slate-400 mt-0.5">
                 Active status dashboard and instructions panel.

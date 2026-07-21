@@ -1,6 +1,6 @@
 {
-  "name": "",
-  "description": "",
+  "name": "MCQ Exam Simulator",
+  "description": "An interactive full-stack practice platform for quantitative aptitude, logical reasoning, verbal ability, and programming MCQ examinations.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

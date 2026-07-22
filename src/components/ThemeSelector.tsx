@@ -18,6 +18,34 @@ export const THEMES: Theme[] = [
     }
   },
   {
+    id: 'vercel-dark',
+    name: 'Vercel Dark',
+    isDark: true,
+    className: 'theme-vercel-dark',
+    colors: {
+      bg: 'bg-black',
+      card: 'bg-zinc-950 border-zinc-800 shadow-lg shadow-black/40',
+      text: 'text-zinc-100',
+      primary: 'bg-white hover:bg-zinc-200 text-black font-semibold shadow-sm transition-all',
+      accent: 'text-indigo-400 font-bold',
+      border: 'border-zinc-800',
+    }
+  },
+  {
+    id: 'vercel-light',
+    name: 'Vercel Light',
+    isDark: false,
+    className: 'theme-vercel-light',
+    colors: {
+      bg: 'bg-white',
+      card: 'bg-zinc-50 border-zinc-200/90 shadow-sm',
+      text: 'text-zinc-900',
+      primary: 'bg-zinc-900 hover:bg-zinc-800 text-white font-semibold shadow-sm transition-all',
+      accent: 'text-indigo-600 font-bold',
+      border: 'border-zinc-200',
+    }
+  },
+  {
     id: 'space-slate',
     name: 'Space Slate (Dark)',
     isDark: true,
@@ -164,18 +192,75 @@ interface ThemeSelectorProps {
   onThemeChange: (theme: Theme) => void;
 }
 
+interface SunMoonToggleProps {
+  currentTheme: Theme;
+  onThemeChange: (theme: Theme) => void;
+}
+
+export const SunMoonToggle: React.FC<SunMoonToggleProps> = ({ currentTheme, onThemeChange }) => {
+  const isDark = currentTheme.isDark;
+
+  const handleToggle = (targetDark: boolean) => {
+    if (targetDark === isDark) return;
+    if (targetDark) {
+      // Find default dark theme
+      const darkTheme = THEMES.find(t => t.id === 'vercel-dark') || THEMES.find(t => t.isDark) || THEMES[0];
+      onThemeChange(darkTheme);
+    } else {
+      // Find default light theme
+      const lightTheme = THEMES.find(t => t.id === 'vercel-light') || THEMES.find(t => !t.isDark) || THEMES[4];
+      onThemeChange(lightTheme);
+    }
+  };
+
+  return (
+    <div className="flex items-center p-1 rounded-xl bg-slate-900/80 dark:bg-slate-900/80 border border-slate-700/60 shadow-inner gap-1">
+      <button
+        id="theme-toggle-light-btn"
+        onClick={() => handleToggle(false)}
+        className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+          !isDark
+            ? 'bg-amber-500 text-slate-950 shadow-md font-extrabold scale-105'
+            : 'text-slate-400 hover:text-amber-400 hover:bg-slate-800/60'
+        }`}
+        title="Switch to Light Mode (Sun)"
+      >
+        <Sun className={`w-3.5 h-3.5 ${!isDark ? 'text-slate-950 fill-slate-950' : 'text-amber-400'}`} />
+        <span className="hidden sm:inline">Light</span>
+      </button>
+
+      <button
+        id="theme-toggle-dark-btn"
+        onClick={() => handleToggle(true)}
+        className={`px-2.5 py-1 rounded-lg flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer ${
+          isDark
+            ? 'bg-indigo-600 text-white shadow-md font-extrabold scale-105'
+            : 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800/60'
+        }`}
+        title="Switch to Dark Mode (Moon)"
+      >
+        <Moon className={`w-3.5 h-3.5 ${isDark ? 'text-white fill-white' : 'text-indigo-400'}`} />
+        <span className="hidden sm:inline">Dark</span>
+      </button>
+    </div>
+  );
+};
+
 export const ThemeSelector: React.FC<ThemeSelectorProps> = ({ currentTheme, onThemeChange }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="relative z-50">
+    <div className="relative z-50 flex items-center gap-2">
+      {/* Direct Sun & Moon Dark/Light Mode Section */}
+      <SunMoonToggle currentTheme={currentTheme} onThemeChange={onThemeChange} />
+
       <button
         id="theme-select-btn"
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg border text-sm transition-all bg-opacity-10 backdrop-blur-md cursor-pointer hover:bg-opacity-20 border-slate-700 text-slate-300 hover:text-white"
-        title="Choose Theme"
+        className="flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all bg-slate-900/80 backdrop-blur-md cursor-pointer hover:bg-slate-800 border-slate-700/80 text-slate-300 hover:text-white"
+        title="Choose Custom Preset Theme"
       >
-        <Palette className="w-4 h-4 text-indigo-400 animate-pulse" />
+        <Palette className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
         <span className="hidden md:inline font-medium">{currentTheme.name}</span>
       </button>
 
@@ -183,9 +268,11 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({ currentTheme, onTh
         <>
           <div className="fixed inset-0" onClick={() => setIsOpen(false)} />
           <div className="absolute right-0 mt-2 w-64 rounded-xl border p-2 shadow-2xl backdrop-blur-xl bg-slate-950 border-slate-800 transition-all text-slate-200">
-            <h4 className="px-3 py-2 text-xs font-semibold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-              <Palette className="w-3.5 h-3.5 text-indigo-400" /> Select Theme ({THEMES.length} Options)
-            </h4>
+            <div className="px-3 py-2 flex items-center justify-between border-b border-slate-800 mb-1">
+              <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Palette className="w-3.5 h-3.5 text-indigo-400" /> Presets ({THEMES.length})
+              </h4>
+            </div>
             <div className="grid grid-cols-1 gap-1 max-h-80 overflow-y-auto pr-1">
               {THEMES.map((t) => (
                 <button
@@ -209,9 +296,9 @@ export const ThemeSelector: React.FC<ThemeSelectorProps> = ({ currentTheme, onTh
                       <Sun className="w-3 h-3 text-amber-500" />
                     )}
                     <span
-                      className="w-3 h-3 rounded-full inline-block"
+                      className="w-3 h-3 rounded-full inline-block border border-white/10"
                       style={{
-                        backgroundColor: t.id === 'immersive-ui' ? '#6366f1' : t.id === 'cyberpunk-neon' ? '#ec4899' : t.id === 'calming-forest' ? '#047857' : t.id === 'classic-amber' ? '#f59e0b' : '#4f46e5'
+                        backgroundColor: t.id === 'vercel-dark' ? '#000000' : t.id === 'vercel-light' ? '#ffffff' : t.id === 'immersive-ui' ? '#6366f1' : t.id === 'cyberpunk-neon' ? '#ec4899' : t.id === 'calming-forest' ? '#047857' : t.id === 'classic-amber' ? '#f59e0b' : '#4f46e5'
                       }}
                     />
                   </div>

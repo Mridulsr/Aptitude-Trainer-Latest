@@ -1,5 +1,7 @@
 export type ThemeId =
   | 'immersive-ui'
+  | 'vercel-dark'
+  | 'vercel-light'
   | 'space-slate'
   | 'cosmic-indigo'
   | 'cyberpunk-neon'

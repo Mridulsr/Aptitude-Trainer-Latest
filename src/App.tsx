@@ -121,17 +121,17 @@ export default function App() {
   const getTabClass = (tab: typeof activeTab) => {
     const isActive = activeTab === tab;
     const base = "px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer";
-    if (currentTheme.id === 'immersive-ui') {
+    if (!currentTheme.isDark) {
       return `${base} ${
         isActive
-          ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
-          : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/5'
+          ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20'
+          : 'text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100/90 border border-transparent'
       }`;
     }
     return `${base} ${
       isActive
-        ? 'bg-indigo-600 text-white shadow-lg'
-        : 'text-slate-400 hover:text-white hover:bg-slate-900/60'
+        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
+        : 'text-slate-400 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/5'
     }`;
   };
 
@@ -142,14 +142,14 @@ export default function App() {
   return (
     <div className={`min-h-screen ${currentTheme.colors.bg} ${currentTheme.colors.text} transition-colors duration-500 pb-12`}>
       {/* Top Main Navigation Header */}
-      <header className={`border-b ${currentTheme.id === 'immersive-ui' ? 'border-white/5 bg-[#080A0F]' : 'border-slate-800/80 bg-slate-950/60'} backdrop-blur-xl sticky top-0 z-40 px-4 md:px-8 py-3.5 flex items-center justify-between`}>
+      <header className={`border-b ${currentTheme.isDark ? 'border-white/10 bg-[#080A0F]/90 text-slate-100' : 'border-zinc-200 bg-white/90 text-zinc-900 shadow-sm'} backdrop-blur-xl sticky top-0 z-40 px-4 md:px-8 py-3.5 flex items-center justify-between transition-all`}>
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-indigo-600/10 border border-indigo-500/30 rounded-xl text-indigo-400">
+          <div className="p-2 bg-indigo-600/10 border border-indigo-500/30 rounded-xl text-indigo-500">
             <Code className="w-5 h-5 animate-pulse" />
           </div>
           <div>
-            <span className="font-extrabold text-base md:text-lg tracking-wider text-white">DSA.<span className="text-indigo-400">viz</span></span>
-            <span className="text-[10px] text-slate-500 block font-semibold leading-none">Interactive Full-Stack Platform</span>
+            <span className={`font-extrabold text-base md:text-lg tracking-wider ${currentTheme.isDark ? 'text-white' : 'text-zinc-900'}`}>DSA.<span className="text-indigo-500">viz</span></span>
+            <span className={`text-[10px] ${currentTheme.isDark ? 'text-slate-400' : 'text-zinc-500'} block font-semibold leading-none`}>Interactive Full-Stack Platform</span>
           </div>
         </div>
 
@@ -195,16 +195,16 @@ export default function App() {
         {/* Theme select & Streak display */}
         <div className="flex items-center gap-3">
           {/* Beautiful Interactive Global Stopwatch in the top right corner */}
-          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-mono text-xs font-black shadow-inner">
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-500 font-mono text-xs font-black shadow-inner">
             <div className="flex items-center gap-1.5">
-              <Timer className={`w-3.5 h-3.5 text-indigo-400 ${isGlobalStopwatchRunning ? 'animate-spin' : ''}`} style={{ animationDuration: '4s' }} />
-              <span className="text-[10px] uppercase text-indigo-400/80 tracking-wider">Timer:</span>
+              <Timer className={`w-3.5 h-3.5 text-indigo-500 ${isGlobalStopwatchRunning ? 'animate-spin' : ''}`} style={{ animationDuration: '4s' }} />
+              <span className="text-[10px] uppercase text-indigo-500/80 tracking-wider">Timer:</span>
               <span className="w-12 text-center">{formatStopwatch(globalStopwatchSeconds)}</span>
             </div>
             <div className="flex items-center gap-1 border-l border-indigo-500/20 pl-2">
               <button
                 onClick={() => setIsGlobalStopwatchRunning(!isGlobalStopwatchRunning)}
-                className="hover:text-white transition-colors cursor-pointer text-indigo-400"
+                className="hover:opacity-80 transition-colors cursor-pointer text-indigo-500"
                 title={isGlobalStopwatchRunning ? "Pause" : "Start"}
               >
                 {isGlobalStopwatchRunning ? <Pause className="w-3 h-3" /> : <Play className="w-3 h-3" />}
@@ -214,7 +214,7 @@ export default function App() {
                   setGlobalStopwatchSeconds(0);
                   setIsGlobalStopwatchRunning(false);
                 }}
-                className="hover:text-white transition-colors cursor-pointer text-indigo-400 ml-0.5"
+                className="hover:opacity-80 transition-colors cursor-pointer text-indigo-500 ml-0.5"
                 title="Reset"
               >
                 <RotateCcw className="w-3 h-3" />
@@ -224,23 +224,23 @@ export default function App() {
 
           <ThemeSelector currentTheme={currentTheme} onThemeChange={handleThemeChange} />
 
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 border border-orange-500/20 text-orange-500">
+          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-500">
             <Flame className="w-4 h-4 animate-bounce" />
             <span className="text-xs font-extrabold font-mono">{userStats.streak} Days</span>
           </div>
 
           {currentUser && (
-            <div className="flex items-center gap-2 border-l border-slate-800/80 pl-3">
+            <div className={`flex items-center gap-2 border-l ${currentTheme.isDark ? 'border-slate-800' : 'border-zinc-200'} pl-3`}>
               <div className="hidden md:block text-right">
-                <span className="text-xs font-bold text-slate-200 block">{currentUser.name}</span>
-                <span className="text-[9px] text-slate-500 block font-semibold leading-none">{currentUser.targetCompany || 'All Companies'} Target</span>
+                <span className={`text-xs font-bold ${currentTheme.isDark ? 'text-slate-200' : 'text-zinc-900'} block`}>{currentUser.name}</span>
+                <span className={`text-[9px] ${currentTheme.isDark ? 'text-slate-400' : 'text-zinc-500'} block font-semibold leading-none`}>{currentUser.targetCompany || 'All Companies'} Target</span>
               </div>
               <button
                 onClick={() => {
                   logoutUser();
                   setCurrentUser(null);
                 }}
-                className="px-2.5 py-1.5 bg-rose-950/20 hover:bg-rose-900/30 text-rose-400 hover:text-rose-300 rounded-xl text-[10px] font-bold border border-rose-900/30 transition-all cursor-pointer"
+                className="px-2.5 py-1.5 bg-rose-500/10 hover:bg-rose-500/20 text-rose-500 rounded-xl text-[10px] font-bold border border-rose-500/20 transition-all cursor-pointer"
                 title="Log Out Account"
               >
                 Log Out
@@ -251,10 +251,10 @@ export default function App() {
       </header>
 
       {/* Small Screen Bottom/Top Navigation Tab Bar */}
-      <div className="lg:hidden bg-slate-950 border-b border-slate-900 flex justify-around py-2 px-1">
+      <div className={`lg:hidden border-b flex justify-around py-2 px-1 ${currentTheme.isDark ? 'bg-slate-950 border-slate-900' : 'bg-zinc-100 border-zinc-200'}`}>
         <button
           onClick={() => setActiveTab('practice-lab')}
-          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase ${activeTab === 'practice-lab' ? 'bg-indigo-600 text-white' : 'text-slate-400'}`}
+          className={`px-2.5 py-1.5 rounded-lg text-[10px] font-bold uppercase ${activeTab === 'practice-lab' ? 'bg-indigo-600 text-white' : currentTheme.isDark ? 'text-slate-400' : 'text-zinc-600'}`}
         >
           Aptitude
         </button>
@@ -292,12 +292,12 @@ export default function App() {
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-8 md:gap-10 items-start">
             {/* Main Content Area - Full width and spacious */}
             <div className="xl:col-span-12 space-y-8 transition-all duration-300">
-              <div className="flex justify-between items-center bg-slate-900/40 p-5 rounded-2xl border border-slate-800/60">
+              <div className={`flex justify-between items-center p-5 rounded-2xl border ${currentTheme.colors.card} transition-all`}>
                 <div>
-                  <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2 uppercase tracking-wider">
+                  <h2 className={`text-sm font-bold flex items-center gap-2 uppercase tracking-wider ${currentTheme.isDark ? 'text-slate-100' : 'text-zinc-900'}`}>
                     {activeTab === 'practice-lab' ? '🎯 Aptitude Trainer' : '⚡ DSA & Visualizers'}
                   </h2>
-                  <p className="text-xs text-slate-400 mt-1">
+                  <p className={`text-xs mt-1 ${currentTheme.isDark ? 'text-slate-400' : 'text-zinc-600'}`}>
                     {activeTab === 'practice-lab' 
                       ? 'Practice quantitative, logical, verbal, and programming placement questions.'
                       : 'Interactive real-time execution flows for key algorithms and structures.'}
@@ -307,7 +307,7 @@ export default function App() {
                   onClick={() => setShowAISidebar(!showAISidebar)}
                   className={`px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer shadow-md ${
                     showAISidebar 
-                      ? 'bg-indigo-600/10 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-600/20' 
+                      ? 'bg-indigo-600/10 text-indigo-500 border border-indigo-500/30 hover:bg-indigo-600/20' 
                       : 'bg-indigo-600 text-white hover:bg-indigo-700'
                   }`}
                 >
@@ -319,14 +319,14 @@ export default function App() {
               {activeTab === 'practice-lab' && (
                 <div className="space-y-10 animate-fade-in">
                   {/* Spacious Slide Toggle Panel */}
-                  <div className="flex bg-slate-950 p-1.5 rounded-2xl border border-slate-800/80 max-w-lg shadow-inner">
+                  <div className={`flex p-1.5 rounded-2xl border max-w-lg shadow-inner ${currentTheme.isDark ? 'bg-slate-950 border-slate-800/80' : 'bg-zinc-100 border-zinc-200'}`}>
                     <button
                       id="btn-apti-sub-practice"
                       onClick={() => setAptitudeSubTab('practice')}
                       className={`flex-1 py-3 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer text-center ${
                         aptitudeSubTab === 'practice'
                           ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
-                          : 'text-slate-400 hover:text-white'
+                          : currentTheme.isDark ? 'text-slate-400 hover:text-white' : 'text-zinc-600 hover:text-zinc-900'
                       }`}
                     >
                       ✍️ Adaptive Practice Quiz
@@ -337,7 +337,7 @@ export default function App() {
                       className={`flex-1 py-3 text-xs md:text-sm font-bold rounded-xl transition-all duration-200 cursor-pointer text-center ${
                         aptitudeSubTab === 'directory'
                           ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20'
-                          : 'text-slate-400 hover:text-white'
+                          : currentTheme.isDark ? 'text-slate-400 hover:text-white' : 'text-zinc-600 hover:text-zinc-900'
                       }`}
                     >
                       🏢 Company Question Directory
@@ -444,7 +444,7 @@ export default function App() {
       </main>
 
       {/* Immersive UI Footer / Status Bar */}
-      <footer className={`mt-12 h-10 ${currentTheme.id === 'immersive-ui' ? 'bg-[#0B0E14] border-t border-white/5 text-white/30' : 'bg-slate-950/80 border-t border-slate-800/80 text-slate-500'} flex items-center justify-between px-6 md:px-12 text-[10px] uppercase tracking-wider`}>
+      <footer className={`mt-12 h-10 ${currentTheme.isDark ? 'bg-[#0B0E14] border-t border-white/5 text-slate-400' : 'bg-zinc-100 border-t border-zinc-200 text-zinc-600'} flex items-center justify-between px-6 md:px-12 text-[10px] uppercase tracking-wider`}>
         <div className="flex gap-6">
           <span>Status: <span className="text-emerald-500 font-bold">● Syncing to Cloud</span></span>
           <span className="hidden md:inline">Server: us-east-prod-01</span>
@@ -468,33 +468,35 @@ export default function App() {
           {/* Drawer Body Panel */}
           <div
             id="ai-drawer-body"
-            className={`fixed right-0 top-0 h-screen bg-[#0A0D14] border-l border-slate-800/80 shadow-2xl z-50 flex flex-col transition-all duration-300 ${
+            className={`fixed right-0 top-0 h-screen ${currentTheme.isDark ? 'bg-[#0A0D14] border-l border-slate-800' : 'bg-white border-l border-zinc-200'} shadow-2xl z-50 flex flex-col transition-all duration-300 ${
               isAIFullscreen ? 'w-full md:w-[85vw]' : 'w-full sm:w-[480px]'
             } animate-slide-in`}
           >
             {/* Drawer Header */}
-            <div className="p-6 border-b border-slate-800/60 flex justify-between items-center bg-slate-900/30">
+            <div className={`p-6 border-b flex justify-between items-center ${currentTheme.isDark ? 'border-slate-800 bg-slate-900/30' : 'border-zinc-200 bg-zinc-50'}`}>
               <div className="flex items-center gap-2">
-                <div className="p-2 bg-indigo-600/15 border border-indigo-500/20 rounded-xl text-indigo-400">
+                <div className="p-2 bg-indigo-600/15 border border-indigo-500/20 rounded-xl text-indigo-500">
                   <Sparkles className="w-5 h-5 animate-pulse" />
                 </div>
                 <div>
-                  <h3 className="text-sm font-extrabold text-white tracking-wide">AI Study Coach & Mentor</h3>
-                  <p className="text-[10px] text-slate-500 leading-none mt-1">Ask questions, get step-by-step guidance</p>
+                  <h3 className={`text-sm font-extrabold tracking-wide ${currentTheme.isDark ? 'text-white' : 'text-zinc-900'}`}>AI Study Coach & Mentor</h3>
+                  <p className={`text-[10px] leading-none mt-1 ${currentTheme.isDark ? 'text-slate-400' : 'text-zinc-500'}`}>Ask questions, get step-by-step guidance</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   id="btn-ai-drawer-expand"
                   onClick={() => setIsAIFullscreen(!isAIFullscreen)}
-                  className="px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 cursor-pointer transition-all flex items-center gap-1"
+                  className="px-3 py-1.5 rounded-lg text-[10px] font-extrabold uppercase bg-indigo-600/10 hover:bg-indigo-600/20 text-indigo-500 border border-indigo-500/20 cursor-pointer transition-all flex items-center gap-1"
                 >
                   {isAIFullscreen ? '🗗 Compact' : '🗖 Fullscreen'}
                 </button>
                 <button
                   id="btn-ai-drawer-close"
                   onClick={() => setShowAISidebar(false)}
-                  className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all cursor-pointer text-sm font-bold"
+                  className={`w-8 h-8 flex items-center justify-center rounded-xl transition-all cursor-pointer text-sm font-bold ${
+                    currentTheme.isDark ? 'text-slate-400 hover:text-white hover:bg-slate-800' : 'text-zinc-500 hover:text-zinc-900 hover:bg-zinc-200'
+                  }`}
                 >
                   ✕
                 </button>
@@ -502,7 +504,7 @@ export default function App() {
             </div>
 
             {/* Chat Content wrapper - scrollable */}
-            <div className="flex-1 overflow-y-auto p-6 bg-slate-950/10">
+            <div className={`flex-1 overflow-y-auto p-6 ${currentTheme.isDark ? 'bg-slate-950/10' : 'bg-zinc-50/50'}`}>
               <DSAChatbot theme={currentTheme} />
             </div>
           </div>

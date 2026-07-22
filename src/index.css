@@ -14,6 +14,14 @@ body {
   color-scheme: dark;
 }
 
+.theme-vercel-dark {
+  color-scheme: dark;
+}
+
+.theme-vercel-light {
+  color-scheme: light;
+}
+
 .theme-space-slate {
   color-scheme: dark;
 }

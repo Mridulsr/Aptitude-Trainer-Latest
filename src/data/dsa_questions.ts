@@ -595,6 +595,68 @@ for (int i = 0; i < ${limit}; i += 2) { ... }`;
           }
         }
 
+        // Deduplicate options and ensure we have exactly 4 unique options
+        let uniqueOpts = Array.from(new Set(options.map(o => String(o).trim())));
+
+        // Make sure the exact answer is in the list
+        const trimmedAns = String(answer).trim();
+        const ansIndexInUnique = uniqueOpts.findIndex(o => o.toLowerCase() === trimmedAns.toLowerCase());
+        
+        if (ansIndexInUnique !== -1) {
+          // Replace it with the exact answer string to preserve casing and value
+          uniqueOpts[ansIndexInUnique] = answer;
+        } else {
+          // If not present, push or replace
+          if (uniqueOpts.length < 4) {
+            uniqueOpts.push(answer);
+          } else {
+            uniqueOpts[0] = answer;
+          }
+        }
+
+        // Fill up to exactly 4 options
+        while (uniqueOpts.length < 4) {
+          const firstOpt = uniqueOpts[0] || '0';
+          if (firstOpt.endsWith('%')) {
+            const numVal = parseInt(firstOpt) || 10;
+            const nextVal = `${numVal + uniqueOpts.length * 10}%`;
+            if (!uniqueOpts.includes(nextVal)) uniqueOpts.push(nextVal);
+            else uniqueOpts.push(`${numVal - uniqueOpts.length * 5}%`);
+          } else if (firstOpt.startsWith('Rs. ')) {
+            const numVal = parseInt(firstOpt.replace('Rs. ', '')) || 100;
+            const nextVal = `Rs. ${numVal + uniqueOpts.length * 20}`;
+            if (!uniqueOpts.includes(nextVal)) uniqueOpts.push(nextVal);
+            else uniqueOpts.push(`Rs. ${numVal - uniqueOpts.length * 10}`);
+          } else if (firstOpt.endsWith(' km')) {
+            const numVal = parseInt(firstOpt.replace(' km', '')) || 5;
+            const nextVal = `${numVal + uniqueOpts.length * 2} km`;
+            if (!uniqueOpts.includes(nextVal)) uniqueOpts.push(nextVal);
+            else uniqueOpts.push(`${numVal - uniqueOpts.length} km`);
+          } else if (firstOpt.includes('/')) {
+            const parts = firstOpt.split('/');
+            const numVal = parseInt(parts[0]) || 1;
+            const denVal = parseInt(parts[1]) || 2;
+            const nextVal = `${numVal + uniqueOpts.length}/${denVal}`;
+            if (!uniqueOpts.includes(nextVal)) uniqueOpts.push(nextVal);
+            else uniqueOpts.push(`${numVal}/${denVal + uniqueOpts.length}`);
+          } else {
+            const numVal = parseFloat(firstOpt);
+            if (!isNaN(numVal)) {
+              const nextVal = `${numVal + uniqueOpts.length * 5}`;
+              if (!uniqueOpts.includes(nextVal)) uniqueOpts.push(nextVal);
+              else uniqueOpts.push(`${numVal - uniqueOpts.length * 2}`);
+            } else {
+              const nextVal = `${firstOpt} (Alt ${uniqueOpts.length})`;
+              uniqueOpts.push(nextVal);
+            }
+          }
+        }
+
+        // Final safety check to make sure the answer is included
+        if (!uniqueOpts.includes(answer)) {
+          uniqueOpts[0] = answer;
+        }
+
         // Add generated question to collection
         list.push({
           id,
@@ -602,7 +664,7 @@ for (int i = 0; i < ${limit}; i += 2) { ... }`;
           topic,
           level,
           question,
-          options,
+          options: uniqueOpts,
           answer,
           explanation
         });

@@ -1007,7 +1007,7 @@ export const AILab: React.FC<AILabProps> = ({
 
             {/* Multiple Options selection */}
             <div className="grid grid-cols-1 gap-3.5">
-              {(shuffledOptions.length > 0 ? shuffledOptions : activeQuestion.options).map((opt) => {
+              {(shuffledOptions.length > 0 ? shuffledOptions : activeQuestion.options).map((opt, optIdx) => {
                 const isSelected = selectedOption === opt;
                 let optBorder = 'border-slate-800 bg-slate-950/40 hover:border-slate-700';
 
@@ -1024,8 +1024,8 @@ export const AILab: React.FC<AILabProps> = ({
 
                 return (
                   <button
-                    id={`opt-btn-${opt}`}
-                    key={opt}
+                    id={`opt-btn-${opt}-${optIdx}`}
+                    key={`${opt}-${optIdx}`}
                     onClick={() => {
                       if (!isSubmitted) {
                         setSelectedOption(selectedOption === opt ? '' : opt);
